@@ -1,15 +1,8 @@
-name: CI/CD for GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - develop   # Staging
-      - main      # Production
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+    branches: ["develop", "main"]
 
 jobs:
   build:
@@ -18,11 +11,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build site
+      - name: Prepare public folder
         run: |
+          rm -rf public
           mkdir -p public
-          # Copy everything except .git into public
-          rsync -av --exclude='.git' ./ ./public/
+          rsync -av --exclude='.git' --exclude='.github' ./ ./public/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v2
@@ -31,9 +24,12 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
@@ -41,5 +37,5 @@ jobs:
 
       - name: Show deployed URL
         run: |
-          echo "Deployed site URL: ${{ steps.deployment.outputs.page_url }}"
+          echo "Site is live at: ${{ steps.deployment.outputs.page_url }}"
 
