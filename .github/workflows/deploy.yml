@@ -21,10 +21,8 @@ jobs:
       - name: Build site
         run: |
           mkdir -p public
-          # Copy everything into the public folder
           cp -r * public/ || true
 
-      # Upload public folder for GitHub Pages deployment
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
@@ -47,4 +45,28 @@ jobs:
           else
             echo "Production site is live at: ${{ steps.deployment.outputs.page_url }}"
           fi
+
+      - name: Send Slack notification
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          STATUS="${{ job.status }}"
+          COLOR="#36a64f"   # Default green for success
+          if [ "$STATUS" != "success" ]; then
+            COLOR="#ff0000" # Red for failure
+          fi
+          BRANCH="${{ github.ref_name }}"
+          URL="${{ steps.deployment.outputs.page_url }}"
+          PAYLOAD="{
+            \"attachments\": [
+              {
+                \"color\": \"$COLOR\",
+                \"title\": \"GitHub Pages Deployment\",
+                \"text\": \"Branch *$BRANCH* finished with status *$STATUS*.\nSite URL: $URL\",
+                \"mrkdwn_in\": [\"text\", \"pretext\"]
+              }
+            ]
+          }"
+          curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" $SLACK_WEBHOOK_URL
 
