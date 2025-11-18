@@ -1,72 +1,19 @@
-name: GitHub Pages CI/CD
-
-on:
-  push:
-    branches:
-      - main       # Production
-      - develop    # Staging
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build site
-        run: |
-          mkdir -p public
-          cp -r * public/ || true
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: ./public
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Show deployed URL
-        run: |
-          if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
-            echo "Staging site is live at: ${{ steps.deployment.outputs.page_url }}"
-          else
-            echo "Production site is live at: ${{ steps.deployment.outputs.page_url }}"
-          fi
-
-      - name: Send Slack notification
-        if: always()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          STATUS="${{ job.status }}"
-          COLOR="#36a64f"   # Default green for success
-          if [ "$STATUS" != "success" ]; then
-            COLOR="#ff0000" # Red for failure
-          fi
-          BRANCH="${{ github.ref_name }}"
-          URL="${{ steps.deployment.outputs.page_url }}"
-          PAYLOAD="{
-            \"attachments\": [
-              {
-                \"color\": \"$COLOR\",
-                \"title\": \"GitHub Pages Deployment\",
-                \"text\": \"Branch *$BRANCH* finished with status *$STATUS*.\nSite URL: $URL\",
-                \"mrkdwn_in\": [\"text\", \"pretext\"]
-              }
-            ]
-          }"
-          curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" $SLACK_WEBHOOK_URL
-
+- name: Send Slack notification
+  if: always()
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  run: |
+    sudo apt-get update && sudo apt-get install -y jq
+    STATUS="${{ job.status }}"
+    COLOR="#36a64f"
+    if [ "$STATUS" != "success" ]; then
+      COLOR="#ff0000"
+    fi
+    BRANCH="${{ github.ref_name }}"
+    URL="${{ steps.deployment.outputs.page_url }}"
+    PAYLOAD=$(jq -n \
+      --arg color "$COLOR" \
+      --arg title "GitHub Pages Deployment" \
+      --arg text "Branch *$BRANCH* finished with status *$STATUS*.\nSite URL: $URL" \
+      '{attachments: [{color: $color, title: $title, text: $text, mrkdwn_in: ["text", "pretext"]}]}')
+    curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
