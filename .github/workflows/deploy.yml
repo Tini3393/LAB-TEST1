@@ -1,19 +1,45 @@
-- name: Send Slack notification
-  if: always()
-  env:
-    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-  run: |
-    sudo apt-get update && sudo apt-get install -y jq
-    STATUS="${{ job.status }}"
-    COLOR="#36a64f"
-    if [ "$STATUS" != "success" ]; then
-      COLOR="#ff0000"
-    fi
-    BRANCH="${{ github.ref_name }}"
-    URL="${{ steps.deployment.outputs.page_url }}"
-    PAYLOAD=$(jq -n \
-      --arg color "$COLOR" \
-      --arg title "GitHub Pages Deployment" \
-      --arg text "Branch *$BRANCH* finished with status *$STATUS*.\nSite URL: $URL" \
-      '{attachments: [{color: $color, title: $title, text: $text, mrkdwn_in: ["text", "pretext"]}]}')
-    curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+name: CI/CD for GitHub Pages
+
+on:
+  push:
+    branches:
+      - develop   # Staging
+      - main      # Production
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build site
+        run: |
+          mkdir -p public
+          # Copy everything except .git into public
+          rsync -av --exclude='.git' ./ ./public/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Show deployed URL
+        run: |
+          echo "Deployed site URL: ${{ steps.deployment.outputs.page_url }}"
+
