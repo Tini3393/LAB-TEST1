@@ -1,4 +1,4 @@
-name: CI/CD Pages Deployment
+name: CI/CD Pipeline
 
 on:
   push:
@@ -14,26 +14,26 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      artifact-path: ./public
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Build site
         run: |
           mkdir -p public
-          echo "<h1>Hello from ${{ github.ref_name }}!</h1>" > public/index.html
+          echo "<h1>Hello World</h1>" > public/index.html
+          # Or your real build command here
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v4
         with:
           path: ./public
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
