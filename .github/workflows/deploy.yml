@@ -1,10 +1,10 @@
-name: CI/CD Pipeline
+name: GitHub Pages CI/CD
 
 on:
   push:
     branches:
-      - main      # Production
-      - develop   # Staging
+      - main       # Production
+      - develop    # Staging
 
 permissions:
   contents: read
@@ -21,9 +21,10 @@ jobs:
       - name: Build site
         run: |
           mkdir -p public
-          echo "<h1>Hello World</h1>" > public/index.html
-          # Or your real build command here
+          # Copy everything into the public folder
+          cp -r * public/ || true
 
+      # Upload public folder for GitHub Pages deployment
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
